@@ -1,53 +1,52 @@
-const express = require('express');
-const router = express.Router();
+// Import necessary modules
+const express = require('express'); // Express framework for creating the router
+const router = express.Router(); // Create a new router instance
 
-const rateLimit = {}; // Object to store user request timestamps
+const rateLimit = {}; // Object to store user request timestamps for rate limiting
 
-const RATE_LIMIT = 5; // Max requests per minute
-const WINDOW_TIME = 60 * 1000; // 1 minute in milliseconds
+const RATE_LIMIT = 5; // Maximum number of requests allowed per minute per user
+const WINDOW_TIME = 60 * 1000; // Time window for rate limiting (1 minute in milliseconds)
 
 // Rate Limiting Middleware
 const rateLimitingMiddleware = (req, res, next) => {
-  const userIp = req.ip; // You can use req.user if you're identifying users with a token
+  const userIp = req.ip; // Identify users based on their IP address (can be replaced with tokens for authenticated users)
 
-  // Check if userIp exists in the rateLimit object
+  // Check if the user IP is already tracked in the rateLimit object
   if (!rateLimit[userIp]) {
-    // Initialize user data if not exists
+    // Initialize the user's data if it doesn't exist
     rateLimit[userIp] = {
-      requests: 1,
-      firstRequestTime: Date.now()
+      requests: 1, // Start with 1 request
+      firstRequestTime: Date.now() // Record the timestamp of the first request
     };
-    return next();
+    return next(); // Allow the request
   }
 
-  // Get the current user data
+  // Retrieve the current user's data
   const userData = rateLimit[userIp];
 
-  // Check if the current request is within the same 1-minute window
+  // Get the current time
   const currentTime = Date.now();
+
+  // Check if the request is within the same rate limit window (1 minute)
   if (currentTime - userData.firstRequestTime < WINDOW_TIME) {
-    // If under the limit, increment the request count
+    // If the user is still under the request limit
     if (userData.requests < RATE_LIMIT) {
-      userData.requests++;
-      return next();
+      userData.requests++; // Increment the request count
+      return next(); // Allow the request
     } else {
-      // If the limit is exceeded, send a rate limit error
+      // Deny the request if the rate limit is exceeded
       return res.status(429).json({ error: 'Rate limit exceeded. Try again later.' });
     }
   } else {
-    // Reset count if it's a new window (1 minute has passed)
-    userData.requests = 1;
-    userData.firstRequestTime = currentTime;
-    return next();
+    // If the 1-minute window has passed, reset the user's request count and timestamp
+    userData.requests = 1; // Reset request count
+    userData.firstRequestTime = currentTime; // Reset the timestamp
+    return next(); // Allow the request
   }
 };
 
 // Apply rateLimitingMiddleware only to /private route
 router.use('/private', rateLimitingMiddleware);
 
-// // Example route to test the rate limiting
-// router.get('/private', (req, res) => {
-//   res.status(200).json({ message: 'Welcome to the private dashboard!' });
-// });
-
+// Export the router for use in other parts of the application
 module.exports = router;
